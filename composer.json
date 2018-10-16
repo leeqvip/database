@@ -1,0 +1,21 @@
+{
+    "name": "techone/database",
+    "keywords": ["pdo", "database", "orm", "framework"],
+    "description": "PDO database library",
+    "authors": [
+        {
+            "name": "TechLee",
+            "email": "techlee@qq.com"
+        }
+    ],
+    "license": "Apache-2.0",
+    "require": {
+    	"php": ">=5.4.0",
+        "ext-pdo": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "TechOne\\Database\\": "src/"
+        }
+    }
+}
