@@ -6,8 +6,8 @@ the current supported databases are:
 
 | type | database |
 | ------ | ------ |
-| mysql | PostgreSQL |
-| pgsql | MySQL |
+| mysql | MySQL |
+| pgsql | PostgreSQL |
 | sqlite | SQLite |
 | sqlsrv | SqlServer |
 
@@ -42,3 +42,7 @@ $connection->query('SELECT * FROM `users` WHERE `id` = :id', ['id' => 1]);
 
 $connection->execute('UPDATE `users` SET `name` = "joker" where `id` = :id', ['id' => 1]);
 ```
+
+### License
+
+This project is licensed under the [Apache 2.0 license](LICENSE).
