@@ -1,7 +1,7 @@
 <?php
-namespace TechOne\Database;
+namespace Leeqvip\Database;
 
-use TechOne\Database;
+use Leeqvip\Database;
 
 /**
  * Database Manager

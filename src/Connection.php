@@ -1,5 +1,6 @@
 <?php
-namespace TechOne\Database;
+
+namespace Leeqvip\Database;
 
 use InvalidArgumentException;
 use PDO;
@@ -28,12 +29,12 @@ class Connection
 
         $connector = ucfirst($connector);
 
-        $connector = '\\TechOne\\Database\\Connectors\\' . $connector;
+        $connector = '\\Leeqvip\\Database\\Connectors\\' . $connector;
 
         if (!class_exists($connector)) {
             throw new InvalidArgumentException(sprintf('%s connector not found', $config['type']));
         }
-        $this->connector = new $connector;
+        $this->connector = new $connector();
     }
 
     public function getPdo()
@@ -52,9 +53,7 @@ class Connection
 
     public function query($sql, $bind = [])
     {
-
         try {
-
             $statement = $this->getPdo()->prepare($sql);
 
             foreach ($bind as $key => $val) {
@@ -64,7 +63,6 @@ class Connection
             $statement->execute();
 
             return $statement->fetchAll(PDO::FETCH_ASSOC);
-
         } catch (\Throwable $e) {
             throw $e;
         }
@@ -73,7 +71,6 @@ class Connection
     public function execute($sql, $bind = [])
     {
         try {
-
             $statement = $this->getPdo()->prepare($sql);
 
             foreach ($bind as $key => $val) {
@@ -84,7 +81,6 @@ class Connection
             $statement->execute();
 
             return $statement->rowCount();
-
         } catch (\Throwable $e) {
             throw $e;
         }

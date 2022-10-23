@@ -1,6 +1,6 @@
 <?php
 
-namespace TechOne\Database\Connectors;
+namespace Leeqvip\Database\Connectors;
 
 use PDO;
 

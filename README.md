@@ -16,7 +16,7 @@ the current supported databases are:
 Use [Composer](https://getcomposer.org/)
 
 ```
-composer require techone/database
+composer require leeqvip/database
 ```
 
 ### Usage
@@ -24,7 +24,7 @@ composer require techone/database
 ```php
 require_once './vendor/autoload.php';
 
-use TechOne\Database\Manager;
+use Leeqvip\Database\Manager;
 
 $config = [
     'type'     => 'mysql', // mysql,pgsql,sqlite,sqlsrv
