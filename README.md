@@ -1,5 +1,11 @@
 # Database library for PHP
 
+[![PHPUnit](https://github.com/leeqvip/database/actions/workflows/phpunit.yml/badge.svg)](https://github.com/leeqvip/database/actions/workflows/phpunit.yml)
+[![Coverage Status](https://coveralls.io/repos/github/leeqvip/database/badge.svg)](https://coveralls.io/github/leeqvip/database)
+[![Latest Stable Version](https://poser.pugx.org/leeqvip/database/v/stable)](https://packagist.org/packages/leeqvip/database)
+[![Total Downloads](https://poser.pugx.org/leeqvip/database/downloads)](https://packagist.org/packages/leeqvip/database)
+[![License](https://poser.pugx.org/leeqvip/database/license)](https://packagist.org/packages/leeqvip/database)
+
 PDO database library for PHP.
 
 the current supported databases are:
