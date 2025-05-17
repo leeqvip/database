@@ -37,7 +37,7 @@ class Connection
         $this->connector = new $connector();
     }
 
-    public function getPdo()
+    public function getPdo(): PDO
     {
         if (is_null($this->pdo)) {
             $this->connect();
