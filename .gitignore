@@ -1,0 +1,13 @@
+/vendor/
+
+composer.lock
+
+.vscode
+.idea
+*.iml
+
+# coverage report
+/build
+
+.phpunit.*
+phpunit.xml
