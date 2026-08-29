@@ -23,6 +23,10 @@ class Connection
             $this->config = array_merge($this->config, $config);
         }
 
+        if (empty($config['type'])) {
+            throw new InvalidArgumentException('database type is required');
+        }
+
         $connector = preg_replace_callback('/_([a-zA-Z])/', function ($match) {
             return strtoupper($match[1]);
         }, $config['type']);

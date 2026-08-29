@@ -54,7 +54,7 @@ abstract class Connector
 
         } catch (PDOException $e) {
             if ($autoConnection) {
-                return $this->createConnection($config, $autoConnection);
+                return $this->createConnection($config, false);
             } else {
                 throw $e;
             }
