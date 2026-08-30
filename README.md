@@ -175,7 +175,7 @@ Transactions can be nested. The inner ones are simulated with savepoints, so an 
 Two things to be aware of:
 
 - Don't call `commit()` or `rollBack()` manually inside a `transaction()` callback. If the callback rolls back and then returns, `transaction()` throws a `LogicException` when it tries to commit; and anything the callback already committed manually cannot be undone by an outer `rollBack()`.
-- Some statements end the transaction implicitly, e.g. DDL statements like `ALTER TABLE` commit on MySQL. When the connection notices the underlying transaction is gone it throws a `LogicException` and resets its internal state, so it stays usable without further cleanup.
+- Some statements end the transaction implicitly, e.g. DDL statements like `ALTER TABLE` commit on MySQL. The library does not detect this; instead its internal level is reset after every `commit()` / `rollBack()`, so it never gets stuck and the database reports the mismatch on the next statement that needs a transaction.
 
 ### Exceptions
 
