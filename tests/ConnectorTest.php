@@ -146,6 +146,44 @@ class ConnectorTest extends TestCase
         $this->assertSame('sqlite:'.__DIR__.'/test.db', $dsn);
     }
 
+    public function testStandardSavepointStatements()
+    {
+        $connector = new Sqlite();
+
+        $pdo = $this->createMock(PDO::class);
+        $pdo->expects($this->once())->method('exec')->with('SAVEPOINT trans_2');
+        $connector->createSavepoint($pdo, 'trans_2');
+
+        $pdo = $this->createMock(PDO::class);
+        $pdo->expects($this->once())->method('exec')->with('RELEASE SAVEPOINT trans_2');
+        $connector->releaseSavepoint($pdo, 'trans_2');
+
+        $pdo = $this->createMock(PDO::class);
+        $pdo->expects($this->once())->method('exec')->with('ROLLBACK TO SAVEPOINT trans_2');
+        $connector->rollbackToSavepoint($pdo, 'trans_2');
+    }
+
+    public function testSqlsrvSavepointStatementsUseSqlServerSyntax()
+    {
+        $connector = new Sqlsrv();
+
+        $pdo = $this->createMock(PDO::class);
+        $pdo->expects($this->once())->method('exec')->with('SAVE TRANSACTION trans_2');
+        $connector->createSavepoint($pdo, 'trans_2');
+
+        $pdo = $this->createMock(PDO::class);
+        $pdo->expects($this->once())->method('exec')->with('ROLLBACK TRANSACTION trans_2');
+        $connector->rollbackToSavepoint($pdo, 'trans_2');
+    }
+
+    public function testSqlsrvDoesNotReleaseSavepoints()
+    {
+        $pdo = $this->createMock(PDO::class);
+        $pdo->expects($this->never())->method('exec');
+
+        (new Sqlsrv())->releaseSavepoint($pdo, 'trans_2');
+    }
+
     public function testCreateConnectionWithDefaultConfig()
     {
         $connector = new class extends Sqlite {

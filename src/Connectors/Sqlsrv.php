@@ -28,4 +28,19 @@ class Sqlsrv extends Connector
 
         return $dsn;
     }
+
+    public function createSavepoint(PDO $pdo, string $name): void
+    {
+        $pdo->exec('SAVE TRANSACTION ' . $name);
+    }
+
+    public function releaseSavepoint(PDO $pdo, string $name): void
+    {
+        // SQL Server has no RELEASE SAVEPOINT; savepoint names can be reused
+    }
+
+    public function rollbackToSavepoint(PDO $pdo, string $name): void
+    {
+        $pdo->exec('ROLLBACK TRANSACTION ' . $name);
+    }
 }

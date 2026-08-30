@@ -3,6 +3,7 @@
 namespace Leeqvip\Database;
 
 use InvalidArgumentException;
+use LogicException;
 use PDO;
 
 /**
@@ -16,6 +17,8 @@ class Connection
     protected $connector;
 
     protected $config = [];
+
+    protected $transLevel = 0;
 
     public function __construct(array $config = [])
     {
@@ -87,6 +90,86 @@ class Connection
             return $statement->rowCount();
         } catch (\Throwable $e) {
             throw $e;
+        }
+    }
+
+    public function beginTransaction(): void
+    {
+        if ($this->transLevel === 0) {
+            $this->getPdo()->beginTransaction();
+        } else {
+            $this->assertTransactionActive();
+            $this->connector->createSavepoint($this->getPdo(), 'trans_' . ($this->transLevel + 1));
+        }
+        $this->transLevel++;
+    }
+
+    public function commit(): void
+    {
+        if ($this->transLevel === 0) {
+            throw new LogicException('there is no active transaction');
+        }
+
+        $this->assertTransactionActive();
+
+        if ($this->transLevel === 1) {
+            $this->getPdo()->commit();
+        } else {
+            $this->connector->releaseSavepoint($this->getPdo(), 'trans_' . $this->transLevel);
+        }
+        $this->transLevel--;
+    }
+
+    public function rollBack(): void
+    {
+        if ($this->transLevel === 0) {
+            throw new LogicException('there is no active transaction');
+        }
+
+        $this->assertTransactionActive();
+
+        if ($this->transLevel === 1) {
+            $this->getPdo()->rollBack();
+        } else {
+            $this->connector->rollbackToSavepoint($this->getPdo(), 'trans_' . $this->transLevel);
+        }
+        $this->transLevel--;
+    }
+
+    /**
+     * Runs the callback inside a transaction. Commits on success,
+     * rolls back and re-throws when the callback throws.
+     *
+     * @template T
+     * @param callable(self):T $callback
+     * @return T
+     */
+    public function transaction(callable $callback)
+    {
+        $this->beginTransaction();
+
+        try {
+            $result = $callback($this);
+            $this->commit();
+            return $result;
+        } catch (\Throwable $e) {
+            if ($this->transLevel > 0) {
+                $this->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * A transaction can end without commit()/rollBack() being called,
+     * e.g. a DDL statement implicitly commits on MySQL. Reset the level
+     * so the connection stays usable.
+     */
+    protected function assertTransactionActive(): void
+    {
+        if (!$this->getPdo()->inTransaction()) {
+            $this->transLevel = 0;
+            throw new LogicException('the transaction was implicitly committed, e.g. by a DDL statement');
         }
     }
 }
