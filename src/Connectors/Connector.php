@@ -61,4 +61,19 @@ abstract class Connector
         }
     }
 
+    public function createSavepoint(PDO $pdo, string $name): void
+    {
+        $pdo->exec('SAVEPOINT ' . $name);
+    }
+
+    public function releaseSavepoint(PDO $pdo, string $name): void
+    {
+        $pdo->exec('RELEASE SAVEPOINT ' . $name);
+    }
+
+    public function rollbackToSavepoint(PDO $pdo, string $name): void
+    {
+        $pdo->exec('ROLLBACK TO SAVEPOINT ' . $name);
+    }
+
 }

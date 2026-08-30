@@ -4,7 +4,9 @@ namespace Tests;
 
 use InvalidArgumentException;
 use Leeqvip\Database\Connection;
+use LogicException;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 abstract class ConnectionTest extends TestCase
 {
@@ -165,5 +167,169 @@ abstract class ConnectionTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         new Connection([]);
+    }
+
+    public function testCommitPersistsChanges()
+    {
+        $this->init();
+        $conn = $this->getConnection();
+
+        $conn->beginTransaction();
+        $conn->execute("INSERT INTO users (id, name, nickname, created_at) VALUES (400, 'dave', 'Small Cloud', '2025-05-17 13:28:56')");
+        $this->assertCount(1, $conn->query("SELECT * FROM users WHERE id = 400"));
+        $conn->commit();
+
+        $this->assertCount(1, $conn->query("SELECT * FROM users WHERE id = 400"));
+    }
+
+    public function testRollbackRevertsChanges()
+    {
+        $this->init();
+        $conn = $this->getConnection();
+
+        $conn->beginTransaction();
+        $conn->execute("INSERT INTO users (id, name, nickname, created_at) VALUES (500, 'eve', 'Small Moon', '2025-05-17 13:28:56')");
+        $conn->rollBack();
+
+        $this->assertCount(0, $conn->query("SELECT * FROM users WHERE id = 500"));
+    }
+
+    public function testTransactionCallbackCommitsOnSuccess()
+    {
+        $this->init();
+        $conn = $this->getConnection();
+
+        $result = $conn->transaction(function (Connection $db) {
+            $db->execute("INSERT INTO users (id, name, nickname, created_at) VALUES (600, 'frank', 'Small Sun', '2025-05-17 13:28:56')");
+            return 'ok';
+        });
+
+        $this->assertEquals('ok', $result);
+        $this->assertCount(1, $conn->query("SELECT * FROM users WHERE id = 600"));
+    }
+
+    public function testTransactionCallbackRollsBackOnException()
+    {
+        $this->init();
+        $conn = $this->getConnection();
+
+        try {
+            $conn->transaction(function (Connection $db) {
+                $db->execute("INSERT INTO users (id, name, nickname, created_at) VALUES (700, 'grace', 'Small Rain', '2025-05-17 13:28:56')");
+                throw new RuntimeException('boom');
+            });
+            $this->fail('Expected RuntimeException to be thrown');
+        } catch (RuntimeException $e) {
+            $this->assertEquals('boom', $e->getMessage());
+        }
+
+        $this->assertCount(0, $conn->query("SELECT * FROM users WHERE id = 700"));
+    }
+
+    public function testNestedTransactionsRollBackInnerOnly()
+    {
+        $this->init();
+        $conn = $this->getConnection();
+
+        $conn->beginTransaction();
+        $conn->execute("INSERT INTO users (id, name, nickname, created_at) VALUES (800, 'henry', 'Small Tree', '2025-05-17 13:28:56')");
+        $conn->beginTransaction();
+        $conn->execute("INSERT INTO users (id, name, nickname, created_at) VALUES (801, 'iris', 'Small Leaf', '2025-05-17 13:28:56')");
+        $conn->rollBack();
+        $conn->commit();
+
+        $this->assertCount(1, $conn->query("SELECT * FROM users WHERE id = 800"));
+        $this->assertCount(0, $conn->query("SELECT * FROM users WHERE id = 801"));
+    }
+
+    public function testNestedTransactionCallbackCommits()
+    {
+        $this->init();
+        $conn = $this->getConnection();
+
+        $conn->transaction(function (Connection $db) {
+            $db->execute("INSERT INTO users (id, name, nickname, created_at) VALUES (900, 'jack', 'Small Lake', '2025-05-17 13:28:56')");
+            $db->transaction(function (Connection $db2) {
+                $db2->execute("INSERT INTO users (id, name, nickname, created_at) VALUES (901, 'kate', 'Small Hill', '2025-05-17 13:28:56')");
+            });
+        });
+
+        $this->assertCount(1, $conn->query("SELECT * FROM users WHERE id = 900"));
+        $this->assertCount(1, $conn->query("SELECT * FROM users WHERE id = 901"));
+    }
+
+    public function testNestedTransactionCallbackRollsBackInnerOnly()
+    {
+        $this->init();
+        $conn = $this->getConnection();
+
+        $conn->transaction(function (Connection $db) {
+            $db->execute("INSERT INTO users (id, name, nickname, created_at) VALUES (910, 'leo', 'Small River', '2025-05-17 13:28:56')");
+            try {
+                $db->transaction(function (Connection $db2) {
+                    $db2->execute("INSERT INTO users (id, name, nickname, created_at) VALUES (911, 'mia', 'Small Stone', '2025-05-17 13:28:56')");
+                    throw new RuntimeException('inner boom');
+                });
+            } catch (RuntimeException $e) {
+                // the inner transaction failed, the outer one keeps going
+            }
+        });
+
+        $this->assertCount(1, $conn->query("SELECT * FROM users WHERE id = 910"));
+        $this->assertCount(0, $conn->query("SELECT * FROM users WHERE id = 911"));
+    }
+
+    public function testCommitWithoutTransactionThrowsException()
+    {
+        $this->init();
+
+        $this->expectException(LogicException::class);
+        $this->getConnection()->commit();
+    }
+
+    public function testRollbackWithoutTransactionThrowsException()
+    {
+        $this->init();
+
+        $this->expectException(LogicException::class);
+        $this->getConnection()->rollBack();
+    }
+
+    /**
+     * A connection whose bookkeeping claims an open transaction while the
+     * underlying PDO has none, as after an implicit commit. Simulated
+     * directly because PDO::inTransaction() does not report raw SQL
+     * COMMIT/ROLLBACK reliably on every driver version.
+     */
+    protected function desyncedConnection()
+    {
+        $conn = new class ($this->config) extends Connection {
+            public function simulateImplicitCommit(): void
+            {
+                $this->transLevel = 1;
+            }
+        };
+        $conn->simulateImplicitCommit();
+
+        return $conn;
+    }
+
+    public function testConnectionStaysUsableAfterImplicitCommit()
+    {
+        $this->init();
+        $conn = $this->desyncedConnection();
+
+        // the driver may accept or reject the commit, but the level must be
+        // reset either way so the connection keeps working
+        try {
+            $conn->commit();
+        } catch (\Throwable) {
+        }
+
+        $conn->beginTransaction();
+        $conn->execute("INSERT INTO users (id, name, nickname, created_at) VALUES (920, 'nina', 'Small Sea', '2025-05-17 13:28:56')");
+        $conn->commit();
+
+        $this->assertCount(1, $conn->query("SELECT * FROM users WHERE id = 920"));
     }
 }

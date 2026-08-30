@@ -136,9 +136,51 @@ $statement->execute();
 
 You may also skip the `Manager` entirely and use `Leeqvip\Database\Connection` directly with the same config array.
 
+#### Transactions
+
+```php
+$connection->beginTransaction();
+try {
+    $connection->execute(
+        'UPDATE `accounts` SET `balance` = `balance` - :amount WHERE `id` = :id',
+        ['amount' => 100, 'id' => 1]
+    );
+    $connection->execute(
+        'UPDATE `accounts` SET `balance` = `balance` + :amount WHERE `id` = :id',
+        ['amount' => 100, 'id' => 2]
+    );
+    $connection->commit();
+} catch (\Throwable $e) {
+    $connection->rollBack();
+    throw $e;
+}
+```
+
+Or use the `transaction()` helper, which commits automatically when the callback returns and rolls back and re-throws when it throws. The callback receives the connection:
+
+```php
+use Leeqvip\Database\Connection;
+
+$balance = $connection->transaction(function (Connection $db) {
+    $db->execute(
+        'UPDATE `accounts` SET `balance` = `balance` - :amount WHERE `id` = :id',
+        ['amount' => 100, 'id' => 1]
+    );
+    return $db->query('SELECT `balance` FROM `accounts` WHERE `id` = :id', ['id' => 1])[0]['balance'];
+});
+```
+
+Transactions can be nested. The inner ones are simulated with savepoints, so an inner `rollBack()` only undoes its own work and leaves the outer transaction intact. This also applies to `transaction()` calls inside a `transaction()` callback.
+
+Two things to be aware of:
+
+- Don't call `commit()` or `rollBack()` manually inside a `transaction()` callback. If the callback rolls back and then returns, `transaction()` throws a `LogicException` when it tries to commit; and anything the callback already committed manually cannot be undone by an outer `rollBack()`.
+- Some statements end the transaction implicitly, e.g. DDL statements like `ALTER TABLE` commit on MySQL. The library does not detect this; instead its internal level is reset after every `commit()` / `rollBack()`, so it never gets stuck and the database reports the mismatch on the next statement that needs a transaction.
+
 ### Exceptions
 
 - A missing `type` or an unknown connector throws `InvalidArgumentException` when the connection object is created (i.e. in `getConnection()`).
+- Calling `commit()` or `rollBack()` without an active transaction throws `LogicException`.
 - Connection and query failures throw `PDOException`.
 
 ### Testing

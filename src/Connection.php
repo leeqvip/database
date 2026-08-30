@@ -3,6 +3,7 @@
 namespace Leeqvip\Database;
 
 use InvalidArgumentException;
+use LogicException;
 use PDO;
 
 /**
@@ -16,6 +17,8 @@ class Connection
     protected $connector;
 
     protected $config = [];
+
+    protected $transLevel = 0;
 
     public function __construct(array $config = [])
     {
@@ -86,6 +89,75 @@ class Connection
 
             return $statement->rowCount();
         } catch (\Throwable $e) {
+            throw $e;
+        }
+    }
+
+    public function beginTransaction(): void
+    {
+        if ($this->transLevel === 0) {
+            $this->getPdo()->beginTransaction();
+        } else {
+            $this->connector->createSavepoint($this->getPdo(), 'trans_' . ($this->transLevel + 1));
+        }
+        $this->transLevel++;
+    }
+
+    public function commit(): void
+    {
+        if ($this->transLevel === 0) {
+            throw new LogicException('there is no active transaction');
+        }
+
+        try {
+            if ($this->transLevel === 1) {
+                $this->getPdo()->commit();
+            } else {
+                $this->connector->releaseSavepoint($this->getPdo(), 'trans_' . $this->transLevel);
+            }
+        } finally {
+            // the transaction may have ended implicitly (e.g. a DDL statement
+            // committed on MySQL); never leave the level stuck
+            $this->transLevel--;
+        }
+    }
+
+    public function rollBack(): void
+    {
+        if ($this->transLevel === 0) {
+            throw new LogicException('there is no active transaction');
+        }
+
+        if ($this->transLevel === 1) {
+            // reset the level first: a failed rollBack must not leave it stuck
+            $this->transLevel = 0;
+            $this->getPdo()->rollBack();
+        } else {
+            $this->connector->rollbackToSavepoint($this->getPdo(), 'trans_' . $this->transLevel);
+            $this->transLevel--;
+        }
+    }
+
+    /**
+     * Runs the callback inside a transaction. Commits on success,
+     * rolls back and re-throws when the callback throws.
+     *
+     * @template T
+     * @param callable(self):T $callback
+     * @return T
+     */
+    public function transaction(callable $callback)
+    {
+        $this->beginTransaction();
+
+        try {
+            $result = $callback($this);
+            $this->commit();
+            return $result;
+        } catch (\Throwable $e) {
+            if ($this->transLevel > 0) {
+                $this->rollBack();
+            }
             throw $e;
         }
     }
