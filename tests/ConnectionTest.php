@@ -295,13 +295,29 @@ abstract class ConnectionTest extends TestCase
         $this->getConnection()->rollBack();
     }
 
+    /**
+     * A connection whose bookkeeping claims an open transaction while the
+     * underlying PDO has none, as after an implicit commit. Simulated
+     * directly because PDO::inTransaction() does not report raw SQL
+     * COMMIT/ROLLBACK reliably on every driver version.
+     */
+    protected function desyncedConnection()
+    {
+        $conn = new class ($this->config) extends Connection {
+            public function simulateImplicitCommit(): void
+            {
+                $this->transLevel = 1;
+            }
+        };
+        $conn->simulateImplicitCommit();
+
+        return $conn;
+    }
+
     public function testCommitAfterImplicitCommitThrowsAndStateRecovers()
     {
         $this->init();
-        $conn = $this->getConnection();
-
-        $conn->beginTransaction();
-        $conn->getPdo()->exec('COMMIT'); // simulates an implicit commit, e.g. a DDL statement on MySQL
+        $conn = $this->desyncedConnection();
 
         try {
             $conn->commit();
@@ -320,10 +336,7 @@ abstract class ConnectionTest extends TestCase
     public function testBeginTransactionAfterImplicitCommitThrowsException()
     {
         $this->init();
-        $conn = $this->getConnection();
-
-        $conn->beginTransaction();
-        $conn->getPdo()->exec('COMMIT');
+        $conn = $this->desyncedConnection();
 
         $this->expectException(LogicException::class);
         $conn->beginTransaction();
